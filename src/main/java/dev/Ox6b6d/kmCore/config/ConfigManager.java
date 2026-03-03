@@ -117,4 +117,23 @@ public class ConfigManager {
         plugin.getLogger().warning("[kmCore][ConfigManager] Unsupported config field type: " + type.getSimpleName());
         return null;
     }
+    /**
+     * Updates a single key inside a {@link Configurable} module's config section,
+     * persists it to disk, and re-injects all registered values back into the module
+     * so the running instance reflects the change immediately.
+     *
+     * <p>The {@code value} type must be one already supported by
+     * {@link #readAs(ConfigurationSection, String, Class)} —
+     * {@code String}, {@code int}, {@code double}, {@code boolean}, or {@code List<String>}.
+     *
+     * @param module the configurable module that owns the key
+     * @param key    the key within the module's config section (e.g. {@code "sword-attack-speed"})
+     * @param value  the new value to write
+     */
+    public void set(Configurable module, String key, Object value) {
+        ConfigurationSection section = getOrCreateSection(module.getConfigSection());
+        section.set(key, value);
+        save();
+        inject(module); // re-inject so the field reflects the new value immediately
+    }
 }

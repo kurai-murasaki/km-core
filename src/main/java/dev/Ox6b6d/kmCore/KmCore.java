@@ -8,6 +8,7 @@ import dev.Ox6b6d.kmCore.module.ModuleManager;
 import dev.Ox6b6d.kmCore.module.impl.JoinModule;
 import dev.Ox6b6d.kmCore.module.impl.ModulesCommandModule;
 import dev.Ox6b6d.kmCore.module.impl.QuitModule;
+import dev.Ox6b6d.kmCore.module.impl.mechanics.CombatModule;
 import dev.Ox6b6d.kmCore.module.impl.mechanics.RedstoneObsidianModule;
 import dev.Ox6b6d.kmCore.module.impl.mechanics.safe.SafeModule;
 import io.papermc.paper.command.brigadier.BasicCommand;
@@ -39,6 +40,7 @@ public final class KmCore extends JavaPlugin {
         moduleManager.register(new QuitModule());
         moduleManager.register(new RedstoneObsidianModule());
         moduleManager.register(new SafeModule(this));
+        moduleManager.register(new CombatModule(this, configManager));
         moduleManager.register(new ModulesCommandModule(moduleManager, configManager));
 
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
