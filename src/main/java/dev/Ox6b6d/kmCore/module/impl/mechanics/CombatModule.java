@@ -45,6 +45,18 @@ import java.util.stream.Collectors;
  *       {@code targetSpeed}.</li>
  * </ol>
  *
+ * <h3>Supported weapon categories</h3>
+ * <ul>
+ *   <li>{@code sword}   — all {@code *_SWORD} materials</li>
+ *   <li>{@code axe}     — all {@code *_AXE} materials</li>
+ *   <li>{@code shovel}  — all {@code *_SHOVEL} materials</li>
+ *   <li>{@code pickaxe} — all {@code *_PICKAXE} materials</li>
+ *   <li>{@code hoe}     — all {@code *_HOE} materials</li>
+ *   <li>{@code trident} — {@link Material#TRIDENT}</li>
+ *   <li>{@code mace}    — {@link Material#MACE}</li>
+ *   <li>{@code spear}   — all {@code *_HOE} materials</li>
+ * </ul>
+ *
  * <h3>Commands</h3>
  * <pre>
  *   /combat list               — list all current weapon speeds
@@ -58,8 +70,8 @@ import java.util.stream.Collectors;
 public class CombatModule implements Module, Configurable, CommandHook,
         PlayerJoinHook, PlayerItemHeldHook {
 
-    private static final MiniMessage MM             = MiniMessage.miniMessage();
-    private static final String      MODIFIER_KEY   = "attack_speed_override";
+    private static final MiniMessage MM           = MiniMessage.miniMessage();
+    private static final String      MODIFIER_KEY = "attack_speed_override";
 
     // -------------------------------------------------------------------------
     // Config — behaviour
@@ -117,6 +129,12 @@ public class CombatModule implements Module, Configurable, CommandHook,
     )
     private double maceAttackSpeed = 0.6;
 
+    @ConfigValue(
+            key     = "spear-attack-speed",
+            comment = "Attack speed for the spear. Vanilla: 1.1"
+    )
+    private double spearAttackSpeed = 1.1;
+
     // -------------------------------------------------------------------------
     // Config — messages
     // -------------------------------------------------------------------------
@@ -155,7 +173,7 @@ public class CombatModule implements Module, Configurable, CommandHook,
             key     = "msg.unknown-weapon",
             comment = "Sent when the weapon argument does not match a known category. Use {input}."
     )
-    private String msgUnknownWeapon = "<red>Unknown weapon type: <gray>{input}<red>. Try: sword, axe, shovel, pickaxe, hoe, trident, mace.";
+    private String msgUnknownWeapon = "<red>Unknown weapon type: <gray>{input}<red>. Try: sword, axe, shovel, pickaxe, hoe, trident, mace, spear.";
 
     @ConfigValue(
             key     = "format.header",
@@ -173,6 +191,10 @@ public class CombatModule implements Module, Configurable, CommandHook,
     // Default speed constants — used by /combat reset
     // -------------------------------------------------------------------------
 
+    /**
+     * Immutable map of weapon category → default attack speed.
+     * Used by {@code /combat reset} to restore original values.
+     */
     private static final Map<String, Double> DEFAULTS = Map.of(
             "sword",   4.0,
             "axe",     1.0,
@@ -180,18 +202,22 @@ public class CombatModule implements Module, Configurable, CommandHook,
             "pickaxe", 1.2,
             "hoe",     4.0,
             "trident", 1.1,
-            "mace",    0.6
+            "mace",    0.6,
+            "spear",   1.1
     );
 
-    /** Ordered list of weapon names for tab-completion and list display. */
+    /**
+     * Ordered list of weapon category names used for tab-completion and
+     * {@code /combat list} display. Order here determines display order.
+     */
     private static final List<String> WEAPON_NAMES =
-            List.of("sword", "axe", "shovel", "pickaxe", "hoe", "trident", "mace");
+            List.of("sword", "axe", "shovel", "pickaxe", "hoe", "trident", "mace", "spear");
 
     // -------------------------------------------------------------------------
     // Internal state
     // -------------------------------------------------------------------------
 
-    private final JavaPlugin   plugin;
+    private final JavaPlugin    plugin;
     private final ConfigManager configManager;
     private NamespacedKey modifierKey;
 
@@ -236,6 +262,8 @@ public class CombatModule implements Module, Configurable, CommandHook,
     /**
      * Applies the correct speed override 1 tick after the player joins,
      * once their held item's built-in modifiers are active.
+     *
+     * @param event the Bukkit {@link PlayerJoinEvent}
      */
     @Override
     public void onPlayerJoin(PlayerJoinEvent event) {
@@ -245,6 +273,8 @@ public class CombatModule implements Module, Configurable, CommandHook,
     /**
      * Re-evaluates the override whenever the player changes their held item.
      * The 1-tick delay lets the game apply the new item's built-in modifiers first.
+     *
+     * @param event the Bukkit {@link PlayerItemHeldEvent}
      */
     @Override
     public void onPlayerItemHeld(PlayerItemHeldEvent event) {
@@ -309,6 +339,9 @@ public class CombatModule implements Module, Configurable, CommandHook,
 
     /**
      * Lists every weapon category alongside its currently configured attack speed.
+     *
+     * @param sender the command sender to reply to
+     * @return always {@code true}
      */
     private boolean cmdList(CommandSender sender) {
         sender.sendMessage(header("Combat — Attack Speeds"));
@@ -324,6 +357,10 @@ public class CombatModule implements Module, Configurable, CommandHook,
      * immediately re-applies modifiers to all online players.
      *
      * <p>Usage: {@code /combat set <weapon> <speed>}
+     *
+     * @param sender the command sender to reply to
+     * @param args   raw command arguments (index 0 is the sub-command)
+     * @return always {@code true}
      */
     private boolean cmdSet(CommandSender sender, String[] args) {
         if (args.length < 3) {
@@ -369,6 +406,10 @@ public class CombatModule implements Module, Configurable, CommandHook,
      * persists each change to disk, and re-applies modifiers to all online players.
      *
      * <p>Usage: {@code /combat reset <weapon|all>}
+     *
+     * @param sender the command sender to reply to
+     * @param args   raw command arguments (index 0 is the sub-command)
+     * @return always {@code true}
      */
     private boolean cmdReset(CommandSender sender, String[] args) {
         if (args.length < 2) {
@@ -407,6 +448,11 @@ public class CombatModule implements Module, Configurable, CommandHook,
         return true;
     }
 
+    /**
+     * Sends the usage summary to {@code sender}.
+     *
+     * @param sender the command sender to reply to
+     */
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(header("combat — Usage"));
         sender.sendMessage(usageLine("/combat list",                  "Show all weapon speeds"));
@@ -488,10 +534,12 @@ public class CombatModule implements Module, Configurable, CommandHook,
      *
      * <p>Detection uses the {@link Material} name suffix so all tiers
      * (WOODEN_, STONE_, IRON_, GOLDEN_, DIAMOND_, NETHERITE_) are covered
-     * automatically.
+     * automatically for tiered weapons. Single-material weapons
+     * ({@link Material#TRIDENT}, {@link Material#MACE}, {@link Material#SPEAR})
+     * are matched directly.
      *
      * @param material the material to classify
-     * @return the configured target speed, or {@code null}
+     * @return the configured target speed, or {@code null} if not a tracked weapon
      */
     private @Nullable Double getTargetSpeed(Material material) {
         if (material == Material.AIR) return null;
@@ -504,6 +552,7 @@ public class CombatModule implements Module, Configurable, CommandHook,
         if (name.endsWith("_HOE"))     return hoeAttackSpeed;
         if (material == Material.TRIDENT) return tridentAttackSpeed;
         if (material == Material.MACE)    return maceAttackSpeed;
+        if (name.endsWith("_SPEAR"))   return spearAttackSpeed;
 
         return null;
     }
@@ -513,7 +562,7 @@ public class CombatModule implements Module, Configurable, CommandHook,
      * (e.g. {@code "sword"}), or {@code null} if the name is unrecognised.
      *
      * @param weapon lowercase weapon category name
-     * @return current configured speed, or {@code null}
+     * @return current configured speed, or {@code null} for an unknown category
      */
     private @Nullable Double getSpeedForWeapon(String weapon) {
         return switch (weapon) {
@@ -524,6 +573,7 @@ public class CombatModule implements Module, Configurable, CommandHook,
             case "hoe"     -> hoeAttackSpeed;
             case "trident" -> tridentAttackSpeed;
             case "mace"    -> maceAttackSpeed;
+            case "spear"   -> spearAttackSpeed;
             default        -> null;
         };
     }
@@ -545,6 +595,7 @@ public class CombatModule implements Module, Configurable, CommandHook,
             case "hoe"     -> hoeAttackSpeed     = speed;
             case "trident" -> tridentAttackSpeed = speed;
             case "mace"    -> maceAttackSpeed    = speed;
+            case "spear"   -> spearAttackSpeed   = speed;
         }
     }
 
@@ -563,36 +614,64 @@ public class CombatModule implements Module, Configurable, CommandHook,
     // Formatting helpers
     // -------------------------------------------------------------------------
 
+    /**
+     * Builds the section header component.
+     *
+     * @param title the title text to embed
+     * @return the formatted {@link Component}
+     */
     private Component header(String title) {
         return MM.deserialize(formatHeader.replace("{title}", title));
     }
 
+    /**
+     * Builds a single weapon-row component for {@code /combat list}.
+     *
+     * @param weapon the weapon category name
+     * @param speed  the configured attack speed
+     * @return the formatted {@link Component}
+     */
     private Component row(String weapon, double speed) {
         return MM.deserialize(formatRow
-                .replace("{weapon}",  weapon)
-                .replace("{speed}",   formatSpeed(speed)));
+                .replace("{weapon}", weapon)
+                .replace("{speed}",  formatSpeed(speed)));
     }
 
+    /**
+     * Builds a usage-line component.
+     *
+     * @param cmd  the command syntax string
+     * @param desc a short description of what it does
+     * @return the formatted {@link Component}
+     */
     private Component usageLine(String cmd, String desc) {
         return MM.deserialize("<gray>  " + cmd + " <dark_gray>— " + desc);
     }
 
     /**
      * Formats a speed value to at most 2 decimal places, stripping trailing
-     * zeros (e.g. {@code 4.0} → {@code "4.0"}, {@code 1.25} → {@code "1.25"}).
+     * zeros but always keeping at least one decimal place
+     * (e.g. {@code 4.0} → {@code "4.0"}, {@code 1.25} → {@code "1.25"}).
      *
      * @param speed the speed value to format
-     * @return a human-readable string
+     * @return a human-readable string representation
      */
     private String formatSpeed(double speed) {
-        // Strip unnecessary trailing zeros but always keep at least one decimal.
         String s = String.format("%.2f", speed);
         s = s.replaceAll("0+$", "");
         if (s.endsWith(".")) s += "0";
         return s;
     }
 
-    /** Convenience: return a new list that is {@code base} plus {@code extra}. */
+    /**
+     * Returns a new list containing all elements of {@code base} followed by
+     * {@code extra}. Used to append {@code "all"} to the weapon list for
+     * {@code /combat reset} tab-completion.
+     *
+     * @param base  the base list
+     * @param extra the extra element to append
+     * @return a new combined list
+     */
     private List<String> concatList(List<String> base, String extra) {
         return java.util.stream.Stream.concat(base.stream(), java.util.stream.Stream.of(extra))
                 .collect(Collectors.toList());
