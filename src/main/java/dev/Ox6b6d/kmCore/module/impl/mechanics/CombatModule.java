@@ -535,7 +535,7 @@ public class CombatModule implements Module, Configurable, CommandHook,
      * <p>Detection uses the {@link Material} name suffix so all tiers
      * (WOODEN_, STONE_, IRON_, GOLDEN_, DIAMOND_, NETHERITE_) are covered
      * automatically for tiered weapons. Single-material weapons
-     * ({@link Material#TRIDENT}, {@link Material#MACE}, {@link Material#SPEAR})
+     * ({@link Material#TRIDENT}, {@link Material#MACE} )
      * are matched directly.
      *
      * @param material the material to classify
